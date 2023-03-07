@@ -1,0 +1,10 @@
+<h1>Add Students for facial recognition</h1>
+<form  method="POST">
+    {{ form.hidden_tag() }}
+    {{ form.name.label }} {{form.name}}
+    {{ form.id.label }} {{form.id}}
+    {{ form.classnumber.label }} {{form.classnumber}}
+    {{ form.time.label }} {{form.time}}
+    <br>
+    {{ form.submit() }}
+</form>

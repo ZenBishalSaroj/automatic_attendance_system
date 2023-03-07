@@ -1,0 +1,101 @@
+body{
+  margin: 0;
+  padding: 0;
+}
+a{
+  text-decoration: none;
+}
+.Nav{
+  margin: 0;
+  padding: 0.5em;
+  font-size: 2em;
+line-height: 1.4;
+font-weight: 900;
+background-color: #2d3436;
+color: white;
+text-align: center;
+}
+.CardContainer{
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(300px,1fr));
+    gap:0em 2em;
+}
+
+@media only screen and (min-width:900px){
+        .CardContainer{
+            width:80%;
+            padding:0 0 0 5em;
+        }
+       
+}
+.Card
+{
+display: grid;
+grid-template-columns:25% 75%;
+grid-column-gap:1em;
+width: 90%;
+height: auto;
+margin: 1em auto; 
+background-color: white;
+padding: 1em;
+overflow: hidden;
+border-radius: 10px;
+transition: all 0.4s;
+box-shadow: 0px 0px 120px -25px rgba(0,0,0, 0.5)
+}
+.Poster img{
+        max-width:100%;
+        height:auto;
+}
+
+.CardHeader{
+display:flex;
+flex-direction:column;
+position: relative;
+  padding: 0.5em 0 0 0;
+}
+.CardHeader h2{
+  margin:0;
+  padding: 0 0 0.4em 0;
+  color: #2b2b2b;
+  font-weight: 900;
+}
+.CardHeader span{
+    color: #555;
+    font-weight:400;
+    padding: 0.3em;
+    margin: 0 0.5em 0 0;
+    border-radius: 5px;
+    border: 2px solid rgba(0,0,0,0.05);
+}
+.CardHeader p{
+  padding:0.2em 0;
+  margin:0;
+  color: #545454;
+  font-weight: 400;
+  font-size: 1em;
+  line-height:1.4
+}
+  
+
+.CardInfoContainer{
+font-size: 0.9em;
+line-height: 1.4;
+font-weight: 300;
+}
+.CardInfoContainer div{
+  display:flex;
+  flex-direction:row;
+  margin: 0 0 0.7em 0;
+}
+.CardInfoContainer span{
+  margin:0 0.2em;
+}
+
+
+
+.GrowDiv{
+padding:0;
+margin:0;
+flex:1;
+}
