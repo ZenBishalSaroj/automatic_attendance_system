@@ -18,11 +18,25 @@
     </div>
     </body>
 </html> -->
-
-<h1>Please enter the class information</h1>
-<form  method="POST">
-    {{ form.hidden_tag() }}
-    {{ form.number.label }} {{form.number}}
-    <br>
-    {{ form.submit() }}
-</form>
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+        <meta charset="utf-8">
+        <title>Add Class Information</title>
+    </head>
+    <body>
+        <div class="Nav">Automatic Attendance System</div>
+        {% if session['classnumber'] %}
+        <h1>This device belongs to class {{session['classnumber']}}</h1>
+        {% else %}
+        <h1>Please enter the class information</h1>
+        {% endif %}
+        <form  method="POST">
+            {{ form.hidden_tag() }}
+            {{ form.number.label }} {{form.number()}}
+            <br>
+            {{ form.submit() }}
+        </form>
+    </body>
+</html>

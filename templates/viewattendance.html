@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+        <meta charset="utf-8">
+        <title>Automatic Attendance System</title>
+    </head>
+    <body>
+        <div class="Nav">Automatic Attendance System</div>
+        <div class="CardContainer">
+            {% for student in students %}
+            <a href=home>
+                <div class="Card">
+                    <div class="Poster">
+                    <img className="poster" src='https://picsum.photos/200/300?random=1'></img>
+                    </div>
+                    <div class="CardHeader">
+                        <h2>Name: {{student.name}}</h2>
+                        <p>Student Id: {{student.studentid}}</p>
+                        <p>Class: {{student.classnumber}}</p>
+                        <p>Time: {{student.time}}</p>
+                        <!-- <p>Total Attendance: {{len([attendance for attendance in students_attendance])}}</p> -->
+                    </div>
+                    <div class="GrowDiv"></div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+       
+    </body>
+</html>

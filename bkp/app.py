@@ -62,20 +62,10 @@ def recognize_from_model(facearray):
     model = joblib.load('static/face_recognition_model.pkl')
     return model.predict(facearray)
 
-def add_attendance(student):
-    name = student.split('_')[0]
-    studentid = student.split('_')[1]
-    classnumber = 5
-    time = datetime.now().strftime("%H:%M:%S")
-
-    new_attendance=Attendance(name,studentid,classnumber,time)
-    db.session.add(new_attendance)
-    db.session.commit()
-
 @app.route('/monitor',methods=['GET'])
 def start():
     if 'face_recognition_model.pkl' not in os.listdir('static'):
-        return render_template('landing.html') 
+        return render_template('app.html',totalreg=totalreg(),datetoday2=datetoday2(),mess='There is no trained model in the static folder. Please add a new face to continue.') 
     cap = cv2.VideoCapture(0)
     ret = True  
     while ret:
@@ -85,14 +75,14 @@ def start():
             cv2.rectangle(frame,(x, y), (x+w, y+h), (255, 0, 20), 2)
             face = cv2.resize(frame[y:y+h,x:x+w], (50, 50))
             student = recognize_from_model(face.reshape(1,-1))[0]
-            #add_attendance(student)
+            add_attendance(student)
             cv2.putText(frame,f'Attendance recorded: {student}',(30,30),cv2.FONT_HERSHEY_SIMPLEX,1,(255, 0, 20),2,cv2.LINE_AA)
         cv2.imshow('Attendance',frame)
         if cv2.waitKey(1)==27:
             break
     cap.release()
     cv2.destroyAllWindows()    
-    return render_template('monitor.html') 
+    return render_template('app.html') 
 #### This function will run when we add a new user
 
 
@@ -106,7 +96,15 @@ class AddStudentsForm(FlaskForm):
     submit = SubmitField('Submit')
 
 
-
+def add_attendance(name):
+    username = name.split('_')[0]
+    userid = name.split('_')[1]
+    current_time = datetime.now().strftime("%H:%M:%S")
+    
+    df = pd.read_csv(f'Attendance/Attendance-{datetoday()}.csv')
+    if int(userid) not in list(df['Roll']):
+        with open(f'Attendance/Attendance-{datetoday()}.csv','a') as f:
+            f.write(f'\n{username},{userid},{current_time}')
 
 def datetoday():
     return date.today().strftime("%m_%d_%y")
@@ -127,7 +125,7 @@ def train_model():
     joblib.dump(knn,'static/face_recognition_model.pkl')
 
 @app.route('/addstudents',methods=['GET','POST'])
-def addstudents_index():
+def addstudents():
     form=AddStudentsForm()
     if form.validate_on_submit():
         session['name'] = form.name.data
@@ -135,35 +133,35 @@ def addstudents_index():
         session['classnumber'] = form.classnumber.data
         session['time'] = form.time.data
         new_student=Student(session['name'],session['studentid'],session['classnumber'],session['time'])
-        image_storage_path = 'static/faces/'+session['name']+'-'+str(session['studentid'])
-        if not os.path.isdir(image_storage_path):
-            os.makedirs(image_storage_path)
-        cap = cv2.VideoCapture(0)
-        i,j = 0,0
-        while 1:
-            _,frame = cap.read()
-            faces = extract_faces(frame)
-            for (x,y,w,h) in faces:
-                cv2.rectangle(frame,(x, y), (x+w, y+h), (255, 0, 20), 2)
-                cv2.putText(frame,f'Images Captured: {i}/20',(30,30),cv2.FONT_HERSHEY_SIMPLEX,1,(255, 0, 20),2,cv2.LINE_AA)
-                if j%10==0:
-                    name = session['name']+'_'+str(i)+'.jpg'
-                    cv2.imwrite(image_storage_path+'/'+name,frame[y:y+h,x:x+w])
-                    i+=1
-                j+=1
-            if j==200:
-                break
-            cv2.imshow('Adding new User',frame)
-            if cv2.waitKey(1)==27:
-                break
         db.session.add(new_student)
         db.session.commit()
-        cap.release()
-        cv2.destroyAllWindows()
-        print('Training Model')
-        train_model()
-        return redirect(url_for("thankyou_index"))
-    return render_template('addstudents.html',form=form) 
+        return redirect(url_for("addstudents"))
+    image_storage_path = 'static/faces/'+session['name']+'-'+str(session['id'])
+    if not os.path.isdir(image_storage_path):
+        os.makedirs(image_storage_path)
+    cap = cv2.VideoCapture(0)
+    a,b = 0,0
+    while True:
+        _,frame = cap.read()
+        faces = extract_faces(frame)
+        for (x,y,w,h) in faces:
+            cv2.rectangle(frame,(x, y), (x+w, y+h), (255, 0, 20), 2)
+            cv2.putText(frame,f'Images Captured: {a}/20',(30,30),cv2.FONT_HERSHEY_PLAIN,1,(255, 0, 20),2,cv2.LINE_AA)
+            if b%10==0:
+                name = name+'_'+str(a)+'.jpg'
+                cv2.imwrite(image_storage_path+'/'+name,frame[y:y+h,x:x+w])
+                a=a+1
+            b=b+1
+        if b==200:
+            break
+        cv2.imshow('Adding student info...',frame)
+        if cv2.waitKey(1)==27:
+            break
+    cap.release()
+    cv2.destroyAllWindows()
+    print('Training Model')
+    train_model()    
+    return render_template('app.html') 
 
 
 ########################### View attendance ######################
@@ -175,10 +173,6 @@ def viewattendance_index():
     print(students_attendance)
     return render_template('viewattendance.html',students=students,students_attendance=students_attendance)
 
-######################## Thank you ##############################
-@app.route('/thankyou')
-def thankyou_index():
-    return render_template('thankyou.html')
 
 @app.route('/tryadd',methods=['GET','POST'])
 def tryadd_index():
