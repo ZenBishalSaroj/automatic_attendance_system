@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+        <meta charset="utf-8">
+        <title>Automatic Attendance System</title>
+    </head>
+    <body>
+        <a href="/"><div class="Nav">Automatic Attendance System</div></a>
+        <div class="CardContainer">
+            {% for image in image_list %}
+                <div class="Card">
+                    <div class="Poster">
+                        <img className="poster" src="{{ url_for('static', filename=image.image_src)}}"></img>
+                    </div>
+                    <div class="CardHeader">
+                        <h2>Unknown Person: {{image.image_number}}</h2>
+                    </div>
+                    <div class="GrowDiv"></div>
+                </div>
+            {% endfor %}
+        </div>
+       
+    </body>
+</html>

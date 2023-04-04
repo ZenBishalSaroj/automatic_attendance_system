@@ -26,17 +26,21 @@
         <title>Add Class Information</title>
     </head>
     <body>
-        <div class="Nav">Automatic Attendance System</div>
-        {% if session['classnumber'] %}
-        <h1>This device belongs to class {{session['classnumber']}}</h1>
-        {% else %}
-        <h1>Please enter the class information</h1>
-        {% endif %}
-        <form  method="POST">
-            {{ form.hidden_tag() }}
-            {{ form.number.label }} {{form.number()}}
-            <br>
-            {{ form.submit() }}
-        </form>
+        <a href="/"><div class="Nav">Automatic Attendance System</div></a>
+        <div class="Info" style="display: flex;justify-content: center;align-items: center;height: 80vh;">
+            <div style="display: block;">
+                {% if session['classnumber'] %}
+                <h1>This device belongs to class {{session['classnumber']}}</h1>
+                {% else %}
+                <h1>Please enter the class information to continue. </h1>
+                {% endif %}
+                <form  method="POST" style="margin-left: 2em;padding: 2em;border: 1px solid #bdc3c7; box-shadow: 10px 5px 5px #bdc3c7;">
+                    {{ form.hidden_tag() }}
+                    <p>{{ form.number.label }} {{form.number()}}</p>
+                    {{ form.submit(class_="Button") }}
+                </form>
+            </div>
+           
+        </div>
     </body>
 </html>

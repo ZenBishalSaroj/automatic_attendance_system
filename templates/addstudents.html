@@ -6,16 +6,21 @@
         <title>Add Class Information</title>
     </head>
     <body>
-        <div class="Nav">Automatic Attendance System</div>
-        <h1>Add students for facial recognition</h1>
-        <form  method="POST">
-            {{ form.hidden_tag() }}
-            {{ form.name.label }} {{form.name}}
-            {{ form.studentid.label }} {{form.studentid}}
-            {{ form.classnumber.label }} {{form.classnumber}}
-            {{ form.time.label }} {{form.time}}
-            <br>
-            {{ form.submit() }}
-        </form>
+        <a href="/"><div class="Nav">Automatic Attendance System</div></a>
+        <div style="display: flex;justify-content: center;align-items: center;height: 80vh;">
+            <div style="display: block;">
+                <h1>Add students for facial recognition</h1>
+                <form  method="POST" style="margin-left: 2em;padding: 2em;border: 1px solid #bdc3c7; box-shadow: 10px 5px 5px #bdc3c7;">
+                    <p>{{ form.hidden_tag() }}</p>
+                    <p>{{ form.name.label }} {{form.name}}</p>
+                    <p>{{ form.studentid.label }} {{form.studentid}}</p>
+                    <p>{{ form.classnumber.label }} {{form.classnumber}}</p>
+                    <p>{{ form.time.label }} {{form.time}}</p>
+                    <br>
+                    <p>{{ form.submit() }}</p>
+                </form>
+            </div>
+        </div>
+        
     </body>
 </html>
