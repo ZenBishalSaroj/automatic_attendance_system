@@ -1,6 +1,6 @@
 import cv2
 import os
-from flask import Flask,request,render_template,session,redirect,url_for,make_response
+from flask import Flask,request,render_template,session,redirect,url_for
 from datetime import date
 from datetime import datetime
 import numpy as np
@@ -12,13 +12,8 @@ from wtforms import (StringField, IntegerField,DateTimeField,SubmitField)
 from wtforms.validators import DataRequired
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-import tensorflow as tf
-from keras.preprocessing.image import ImageDataGenerator
-from keras.layers import Convolution2D
-from keras.layers import MaxPool2D
-from keras.layers import Flatten
-from keras.layers import Dense
-import pytz
+import time
+import face_recognition
 
 
 
@@ -36,15 +31,12 @@ db = SQLAlchemy(app)
 
 if not os.path.isdir('static/faces'):
     os.makedirs('static/faces')
-if not os.path.isdir('static/faces/train'):
-    os.makedirs('static/faces/train')
-if not os.path.isdir('static/faces/test'):
-    os.makedirs('static/faces/test')
-if not os.path.isdir('static/faces/captured'):
-    os.makedirs('static/faces/captured')
 if not os.path.isdir('static/faces/unknowns'):
     os.makedirs('static/faces/unknowns')
-
+if not os.path.isdir('static/faces/captured'):
+    os.makedirs('static/faces/captured')
+if not os.path.isdir('static/faces/images'):
+    os.makedirs('static/faces/images')
 
 #################################### Landing ######################
 @app.route('/')
@@ -60,10 +52,9 @@ class ClassInformationForm(FlaskForm):
 
 @app.route('/classinformation', methods=["GET", "POST"])
 def classinformation_index():
-        
     form = ClassInformationForm()
     if form.validate_on_submit():
-        session['classnumber'] = form.number.data
+        session['thisclassnumber'] = form.number.data
         return redirect(url_for("classinformation_index"))
     return render_template('classinformation.html', form=form)
 
@@ -76,34 +67,26 @@ def extract_faces(img):
     return face_points
     
 def recognize_from_model(facearray):
-    model = joblib.load('static/face_recognition_model.pkl')
-    resultmap = joblib.load('static/resultmap.pkl')
-    test_image=tf.keras.utils.load_img('static/faces/captured/'+'cap01.jpg',target_size=(64, 64))
-
-    test_image=tf.keras.utils.img_to_array(test_image)
-    test_image=np.expand_dims(test_image,axis=0)
-
-    result=model.predict(test_image,verbose=0)
-    print(result)
-    if np.max(result)>0.8:
-        print('Prediction is: ',resultmap[np.argmax(result)])
-        return resultmap[np.argmax(result)]
+   
+    if (np.max(result))>0.7:
+        print(result)
+        return model.predict(facearray)
     else:
-        return 'Unknown person'
+        return False
 
 def add_attendance(student):
     name = student.split('-')[0]
     studentid = student.split('-')[1]
-    time = datetime.now(pytz.timezone('America/New_York')).strftime("%H:%M:%S")
+    #time = datetime.now(pytz.timezone('America/New_York')).strftime("%H:%M:%S")
     today = date.today()
     #time = datetime.now().strftime("%H:%M:%S")
     for item in Student.query.filter_by(studentid=studentid):
         student_classnumber = item.classnumber
-    if int(session['classnumber'])==student_classnumber:
+    if int(session['thisclassnumber'])==student_classnumber:
         if Attendance.query.filter_by(studentid=studentid,time=date.today()).count()>0:
             return 'Attendance recorded for today'
         else:
-            new_attendance=Attendance(name,studentid,session['classnumber'],today)
+            new_attendance=Attendance(name,studentid,session['thisclassnumber'],today)
             db.session.add(new_attendance)
             db.session.commit()
             return 'Attendance recorded for today'
@@ -116,9 +99,23 @@ def add_attendance(student):
 def start():
     if not session.get('classnumber'):
         return redirect(url_for("classinformation_index"))
-    if 'face_recognition_model.pkl' not in os.listdir('static'):
-        return redirect(url_for("addstudents_index")) 
+    known_face_encodings = []
+    known_face_names = []
+    userlist = os.listdir('static/faces/images')
+    for user in userlist:
+            img=user.split('-')[0]
+            load_img = face_recognition.load_image_file(f'static/faces/images/{user}/{img}_5.jpg')
+            face_encodinggt = face_recognition.face_encodings(load_img)[0]
+            #known_face_encodings.append(face_recognition.face_encodings(face_recognition.load_image_file(f'static/faces/images/{user}/{img}_0.jpg'))[0])
+            known_face_encodings.append(face_encodinggt)
+            known_face_names.append(user)
+    
     cap = cv2.VideoCapture(0)
+    # Initialize some variables
+    face_locations = []
+    face_encodings = []
+    face_names = []
+    process_this_frame = True
     ret = True  
     while ret:
         ret,frame = cap.read()
@@ -126,25 +123,44 @@ def start():
             (x,y,w,h) = extract_faces(frame)[0]
             cv2.rectangle(frame,(x, y), (x+w, y+h), (255, 0, 20), 2)
             cv2.imwrite('static/faces/captured/'+'cap01.jpg',frame[y:y+h,x:x+w])
-            face = cv2.resize(frame[y:y+h,x:x+w], (64, 64))
+            try:
+                face = face_recognition.face_encodings(face_recognition.load_image_file('static/faces/captured/'+'cap01.jpg'))[0]
+                matches = face_recognition.compare_faces(known_face_encodings,face)
+           
+            #face = [cv2.resize(frame[y:y+h,x:x+w], (64, 64))]
             #student = recognize_from_model(face.reshape(1,-1))[0]
-            student = recognize_from_model(face)
-            print(student)
-            if student=='Unknown person':
-                cv2.imwrite('static/faces/unknowns/'+str(len(next(os.walk('static/faces/train/bishalb-1'))[2])+1)+'.jpg',frame[y:y+h,x:x+w])
-            else:
-                result = add_attendance(student)
-                if result:
-                    cv2.putText(frame,f'Attendance recorded for today: {student}',(30,30),cv2.FONT_HERSHEY_SIMPLEX,1,(255, 0, 20),2,cv2.LINE_AA)
+                name = "Unknown"
+                print(matches)
+                    
+                if True in matches:
+                    first_match_index = matches.index(True)
+                    name = known_face_names[first_match_index]
                 else:
-                    cv2.putText(frame,'You are in a different classroom.',(30,30),cv2.FONT_HERSHEY_SIMPLEX,1,(255, 0, 20),2,cv2.LINE_AA)
-        cv2.imshow('Attendance',frame)
+                    face_distances = face_recognition.face_distance(known_face_encodings, face)
+                    best_match_index = np.argmin(face_distances)
+                    if matches[best_match_index]:
+                        name = known_face_names[best_match_index]
+                student = name
+                if student=='Unknown':
+                    cv2.imwrite('static/faces/unknowns/'+str(len(next(os.walk('static/faces/unknowns'))[2])+1)+'.jpg',frame[y:y+h,x:x+w])
+                else:
+                    result = add_attendance(student)
+                    if result:
+                        cv2.putText(frame,f'Attendance recorded for today. ',(30,30),cv2.FONT_HERSHEY_SIMPLEX,1,(255, 0, 20),2,cv2.LINE_AA)
+                    else:
+                        cv2.putText(frame,'You are in a different classroom.',(30,30),cv2.FONT_HERSHEY_SIMPLEX,1,(255, 0, 20),2,cv2.LINE_AA)
+            except:
+                pass
+        process_this_frame = not process_this_frame
+
+        cv2.imshow('Attendance', frame)
+
         if cv2.waitKey(1)==27:
             break
     cap.release()
-    cv2.destroyAllWindows()    
+    cv2.destroyAllWindows()
     return render_template('monitor.html') 
-#### This function will run when we add a new user
+
 
 
 ############################################# ADD STUDENTS ############################
@@ -163,53 +179,18 @@ def datetoday():
     return date.today().strftime("%m_%d_%y")
 
 def train_model():
-    # faces = []
-    # labels = []
-    # userlist = os.listdir('static/faces')
+    # encoding = []
+    # names = []
+    # userlist = os.listdir('static/faces/images')
     # for user in userlist:
-    #     for imgname in os.listdir(f'static/faces/{user}'):
-    #         img = cv2.imread(f'static/faces/{user}/{imgname}')
-    #         resized_face = cv2.resize(img, (50, 50))
-    #         faces.append(resized_face.ravel())
-    #         labels.append(user)
-    # faces = np.array(faces)
-    # knn = KNeighborsClassifier(n_neighbors=5)
-    # knn.fit(faces,labels)
-    train_datagen = ImageDataGenerator( rescale=1./255,shear_range=0.2,zoom_range=0.2,horizontal_flip=True)
-    training_set = train_datagen.flow_from_directory('static/faces/train',target_size=(64,64),batch_size=32,class_mode='categorical')
-    test_datagen = ImageDataGenerator(rescale=1./255)
-    test_set = test_datagen.flow_from_directory('static/faces/test',target_size=(64,64),batch_size=32,class_mode='categorical')
-
-
-    TrainClasses=training_set.class_indices
-    ResultMap={}
-    for faceValue,faceName in zip(TrainClasses.values(),TrainClasses.keys()):
-        ResultMap[faceValue]=faceName
-    joblib.dump(ResultMap,'static/resultmap.pkl')
-    OutputNeurons=len(ResultMap)
-
-    print('classifier started')
-    #training
-    classifier = tf.keras.models.Sequential()
-    classifier.add(tf.keras.layers.Conv2D(filters=32, kernel_size=(3, 3), strides=(1, 1), input_shape=(64,64,3), activation='relu'))
-    classifier.add(MaxPool2D(pool_size=(2,2)))
-    classifier.add(tf.keras.layers.Conv2D(filters=32, kernel_size=(3, 3), strides=(1, 1), activation='relu'))
-    classifier.add(MaxPool2D(pool_size=(2,2)))
-    classifier.add(tf.keras.layers.Conv2D(filters=64, kernel_size=(3, 3), strides=(1, 1), activation='relu'))
-    classifier.add(MaxPool2D(pool_size=(2,2)))
-    classifier.add(Flatten())
-    classifier.add(Dense(64, activation='relu'))
-    classifier.add(tf.keras.layers.Dropout(0.5))
-    classifier.add(Dense(OutputNeurons, activation='softmax'))
-    
-    classifier.compile(loss='categorical_crossentropy', optimizer = 'adam', metrics=["accuracy"])
-    
-    classifier.fit(
-                        training_set,
-                        epochs=10,
-                        validation_data=test_set)
-    print('classifier finished')
-    joblib.dump(classifier,'static/face_recognition_model.pkl')
+    #         encoding.append(face_recognition.face_encodings(face_recognition.load_image_file(f'static/faces/images/{user}/{user}_0.jpg'))[0])
+    #         names.append(user)
+    # face_locations = []
+    # face_encodings = []
+    # face_names = []
+    # process_this_frame = True
+    return True
+    #joblib.dump(knn,'static/face_recognition_model.pkl')
 
 @app.route('/addstudents',methods=['GET','POST'])
 def addstudents_index():
@@ -220,12 +201,9 @@ def addstudents_index():
         session['classnumber'] = form.classnumber.data
         session['time'] = form.time.data
         new_student=Student(session['name'],session['studentid'],session['classnumber'],session['time'])
-        train_storage_path = 'static/faces/train/'+session['name']+'-'+str(session['studentid'])
-        test_storage_path = 'static/faces/test/'+session['name']+'-'+str(session['studentid'])
-        if not os.path.isdir(train_storage_path):
-            os.makedirs(train_storage_path)
-        if not os.path.isdir(test_storage_path):
-            os.makedirs(test_storage_path)
+        image_storage_path = 'static/faces/images/'+session['name']+'-'+str(session['studentid'])
+        if not os.path.isdir(image_storage_path):
+            os.makedirs(image_storage_path)
         cap = cv2.VideoCapture(0)
         i,j = 0,0
         while 1:
@@ -233,16 +211,13 @@ def addstudents_index():
             faces = extract_faces(frame)
             for (x,y,w,h) in faces:
                 cv2.rectangle(frame,(x, y), (x+w, y+h), (255, 0, 20), 2)
-                cv2.putText(frame,f'Images Captured: {i}/20',(30,30),cv2.FONT_HERSHEY_SIMPLEX,1,(255, 0, 20),2,cv2.LINE_AA)
+                cv2.putText(frame,f'Images Captured: {i}/10',(30,30),cv2.FONT_HERSHEY_SIMPLEX,1,(255, 0, 20),2,cv2.LINE_AA)
                 if j%10==0:
                     name = session['name']+'_'+str(i)+'.jpg'
-                    if i<16:
-                        cv2.imwrite('static/faces/train/'+session['name']+'-'+str(session['studentid'])+'/'+name,frame[y:y+h,x:x+w])
-                    else:
-                        cv2.imwrite('static/faces/test/'+session['name']+'-'+str(session['studentid'])+'/'+name,frame[y:y+h,x:x+w])
+                    cv2.imwrite(image_storage_path+'/'+name,frame[y:y+h,x:x+w])
                     i+=1
                 j+=1
-            if j==200:
+            if j==100:
                 break
             cv2.imshow('Adding new User',frame)
             if cv2.waitKey(1)==27:
@@ -251,6 +226,7 @@ def addstudents_index():
         db.session.commit()
         cap.release()
         cv2.destroyAllWindows()
+        print('Training Model')
         #train_model()
         return redirect(url_for("thankyou_index"))
     return render_template('addstudents.html',form=form) 
@@ -258,22 +234,21 @@ def addstudents_index():
 ############### Train Model ###################
 @app.route('/train')
 def trainmodel_index():
-    if len(next(os.walk('static/faces/train'))[1])<3:
+    if len(next(os.walk('static/faces/images'))[1])<1:
         return render_template('notenough.html')
     train_model()
     return render_template('info.html',msg='Model Training successful. You can now monitor attendance.')
 
-
 ########################### View attendance ######################
 @app.route('/attendance',methods=['GET','POST'])
 def viewattendance_index():
-    if len(next(os.walk('static/faces/train'))[1])<3:
+    if len(next(os.walk('static/faces/images'))[1])<1:
         return render_template('notenough.html')
     students=Student.query.all()
     students_list =[]
     for student in students:
         total_attendance = Attendance.query.filter_by(studentid=student.studentid)
-        image_src = f'/faces/train/{student.name}-{student.studentid}/{student.name}_5.jpg'
+        image_src = f'/faces/images/{student.name}-{student.studentid}/{student.name}_5.jpg'
         students_list.append({"name":student.name,"studentid":student.studentid,"classnumber":student.classnumber,"time":student.time,"attendance_count":total_attendance.count(),"image_src":image_src})
     return render_template('viewattendance.html',students_list=students_list)
 
@@ -289,7 +264,6 @@ def unknowns_index():
         image_list.append({"image_number":i,"image_src":image_src})
     return render_template('unknowns.html',image_list=image_list)
 
-
 ######################## Thank you ##############################
 @app.route('/thankyou')
 def thankyou_index():
@@ -302,7 +276,7 @@ def info_index():
 
 @app.route('/tryadd',methods=['GET','POST'])
 def tryadd_index():
-    # form=AddStudentsForm()
+       # form=AddStudentsForm()
     # if form.validate_on_submit():
     #     session['name'] = form.name.data
     #     session['studentid'] = form.studentid.data
@@ -317,9 +291,9 @@ def tryadd_index():
     #     print('record present')
     # else:
     #     print('record not present')
-    print( len(next(os.walk('static/faces/train/bishalb-1'))[2]))
+    Attendance.query.filter_by(name='saroj').delete()
+    db.session.commit()
     return render_template('info.html',msg='This is a test page.')
-
 
 
 
@@ -373,4 +347,4 @@ with app.app_context():
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True)
